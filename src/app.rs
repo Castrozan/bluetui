@@ -29,7 +29,7 @@ use crate::{
     config::{Config, Width},
     favorite::{read_favorite_devices_from_disk, save_favorite_devices_to_disk},
     notification::Notification,
-    profile::PipewireProfile,
+    profile::{AudioProfile, AudioDeviceId},
     requests::Requests,
     spinner::Spinner,
 };
@@ -70,9 +70,9 @@ pub struct App {
     pub config: Arc<Config>,
     pub requests: Requests,
     pub auth_agent: AuthAgent,
-    pub available_profiles: Vec<PipewireProfile>,
+    pub available_profiles: Vec<AudioProfile>,
     pub profile_state: TableState,
-    pub pipewire_device_id: Option<u32>,
+    pub audio_device_id: Option<AudioDeviceId>,
     pub active_profile_index: Option<u32>,
 }
 
@@ -138,7 +138,7 @@ impl App {
             auth_agent,
             available_profiles: Vec::new(),
             profile_state: TableState::default(),
-            pipewire_device_id: None,
+            audio_device_id: None,
             active_profile_index: None,
         })
     }

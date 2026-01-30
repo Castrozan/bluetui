@@ -236,13 +236,18 @@ pub async fn handle_key_events(
             }
             KeyCode::Enter | KeyCode::Char(' ') => {
                 if let Some(profile_idx) = app.profile_state.selected()
-                    && let Some(pw_device_id) = app.pipewire_device_id
+                    && let Some(ref device_id) = app.audio_device_id
                 {
                     let selected_profile = app.available_profiles[profile_idx].clone();
+                    let device_id = device_id.clone();
                     let sender_clone = sender.clone();
 
                     tokio::spawn(async move {
-                        match profile::switch_profile(pw_device_id, selected_profile.index) {
+                        match profile::switch_profile(
+                            &device_id,
+                            selected_profile.index,
+                            &selected_profile.name,
+                        ) {
                             Ok(_) => {
                                 let _ = Notification::send(
                                     format!("Switched to {}", selected_profile.description).into(),
@@ -263,7 +268,7 @@ pub async fn handle_key_events(
                     app.focused_block = FocusedBlock::PairedDevices;
                     app.available_profiles.clear();
                     app.profile_state.select(None);
-                    app.pipewire_device_id = None;
+                    app.audio_device_id = None;
                     app.active_profile_index = None;
                 }
             }
@@ -707,19 +712,19 @@ pub async fn handle_key_events(
                                         let controller = &app.controllers[selected_controller];
                                         if let Some(index) = app.paired_devices_state.selected() {
                                             let device = &controller.paired_devices[index];
-                                            match profile::get_pipewire_device(&device.addr) {
-                                                Some(pw_device) if !pw_device.profiles.is_empty() => {
-                                                    app.pipewire_device_id = Some(pw_device.id);
+                                            match profile::get_audio_device(&device.addr) {
+                                                Some(audio_device) if !audio_device.profiles.is_empty() => {
+                                                    app.audio_device_id = Some(audio_device.id);
                                                     app.active_profile_index =
-                                                        pw_device.active_profile_index;
-                                                    app.available_profiles = pw_device.profiles;
+                                                        audio_device.active_profile_index;
+                                                    app.available_profiles = audio_device.profiles;
                                                     app.profile_state.select(Some(0));
                                                     app.focused_block =
                                                         FocusedBlock::ProfileSelector;
                                                 }
                                                 _ => {
                                                     let _ = Notification::send(
-                                                        "No PipeWire profiles available".into(),
+                                                        "No audio profiles available (PipeWire/PulseAudio)".into(),
                                                         NotificationLevel::Warning,
                                                         sender.clone(),
                                                     );
