@@ -8,6 +8,7 @@ pub mod favorite;
 pub mod handler;
 mod help;
 pub mod notification;
+pub mod profile;
 pub mod requests;
 pub mod rfkill;
 pub mod spinner;

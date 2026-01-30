@@ -1,6 +1,6 @@
 use std::sync::{Arc, atomic::AtomicBool};
 
-use bluer::{Adapter, Address, Session};
+use bluer::{Adapter, Address, Session, Uuid};
 
 use bluer::Device as BTDevice;
 
@@ -30,11 +30,22 @@ pub struct Device {
     pub is_trusted: bool,
     pub is_connected: bool,
     pub battery_percentage: Option<u8>,
+    pub uuids: Vec<Uuid>,
 }
 
 impl Device {
     pub async fn set_alias(&self, alias: String) -> AppResult<()> {
         self.device.set_alias(alias).await?;
+        Ok(())
+    }
+
+    pub async fn connect_profile(&self, uuid: &Uuid) -> AppResult<()> {
+        self.device.connect_profile(uuid).await?;
+        Ok(())
+    }
+
+    pub async fn disconnect_profile(&self, uuid: &Uuid) -> AppResult<()> {
+        self.device.disconnect_profile(uuid).await?;
         Ok(())
     }
 
@@ -115,6 +126,12 @@ impl Controller {
             let is_connected = device.is_connected().await?;
             let is_favorite = favorite_devices.contains(&addr);
             let battery_percentage = device.battery_percentage().await?;
+            let uuids: Vec<Uuid> = device
+                .uuids()
+                .await?
+                .unwrap_or_default()
+                .into_iter()
+                .collect();
 
             let dev = Device {
                 device,
@@ -126,6 +143,7 @@ impl Controller {
                 is_connected,
                 is_favorite,
                 battery_percentage,
+                uuids,
             };
 
             if dev.is_paired {

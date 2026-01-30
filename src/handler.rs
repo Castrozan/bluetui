@@ -6,6 +6,7 @@ use crate::app::{App, AppResult};
 use crate::config::Config;
 use crate::event::Event;
 use crate::notification::{Notification, NotificationLevel};
+use crate::profile;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use futures::StreamExt;
 use tokio::sync::mpsc::UnboundedSender;
@@ -196,6 +197,77 @@ pub async fn handle_key_events(
                 app.new_alias
                     .handle_event(&crossterm::event::Event::Key(key_event));
             }
+        },
+        FocusedBlock::ProfileSelector => match key_event.code {
+            KeyCode::Esc => {
+                app.focused_block = FocusedBlock::PairedDevices;
+                app.available_profiles.clear();
+                app.profile_state.select(None);
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                if !app.available_profiles.is_empty() {
+                    let i = match app.profile_state.selected() {
+                        Some(i) => {
+                            if i < app.available_profiles.len() - 1 {
+                                i + 1
+                            } else {
+                                0
+                            }
+                        }
+                        None => 0,
+                    };
+                    app.profile_state.select(Some(i));
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if !app.available_profiles.is_empty() {
+                    let i = match app.profile_state.selected() {
+                        Some(i) => {
+                            if i > 0 {
+                                i - 1
+                            } else {
+                                app.available_profiles.len() - 1
+                            }
+                        }
+                        None => 0,
+                    };
+                    app.profile_state.select(Some(i));
+                }
+            }
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                if let Some(profile_idx) = app.profile_state.selected()
+                    && let Some(pw_device_id) = app.pipewire_device_id
+                {
+                    let selected_profile = app.available_profiles[profile_idx].clone();
+                    let sender_clone = sender.clone();
+
+                    tokio::spawn(async move {
+                        match profile::switch_profile(pw_device_id, selected_profile.index) {
+                            Ok(_) => {
+                                let _ = Notification::send(
+                                    format!("Switched to {}", selected_profile.description).into(),
+                                    NotificationLevel::Info,
+                                    sender_clone,
+                                );
+                            }
+                            Err(e) => {
+                                let _ = Notification::send(
+                                    e.into(),
+                                    NotificationLevel::Error,
+                                    sender_clone,
+                                );
+                            }
+                        }
+                    });
+
+                    app.focused_block = FocusedBlock::PairedDevices;
+                    app.available_profiles.clear();
+                    app.profile_state.select(None);
+                    app.pipewire_device_id = None;
+                    app.active_profile_index = None;
+                }
+            }
+            _ => {}
         },
         FocusedBlock::RequestConfirmation => match key_event.code {
             KeyCode::Tab => {
@@ -624,6 +696,37 @@ pub async fn handle_key_events(
 
                                 KeyCode::Char(c) if c == config.paired_device.rename => {
                                     app.focused_block = FocusedBlock::SetDeviceAliasBox;
+                                }
+
+                                KeyCode::Char(c)
+                                    if c == config.paired_device.switch_profile =>
+                                {
+                                    if let Some(selected_controller) =
+                                        app.controller_state.selected()
+                                    {
+                                        let controller = &app.controllers[selected_controller];
+                                        if let Some(index) = app.paired_devices_state.selected() {
+                                            let device = &controller.paired_devices[index];
+                                            match profile::get_pipewire_device(&device.addr) {
+                                                Some(pw_device) if !pw_device.profiles.is_empty() => {
+                                                    app.pipewire_device_id = Some(pw_device.id);
+                                                    app.active_profile_index =
+                                                        pw_device.active_profile_index;
+                                                    app.available_profiles = pw_device.profiles;
+                                                    app.profile_state.select(Some(0));
+                                                    app.focused_block =
+                                                        FocusedBlock::ProfileSelector;
+                                                }
+                                                _ => {
+                                                    let _ = Notification::send(
+                                                        "No PipeWire profiles available".into(),
+                                                        NotificationLevel::Warning,
+                                                        sender.clone(),
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
 
                                 _ => {}

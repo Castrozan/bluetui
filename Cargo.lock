@@ -185,6 +185,7 @@ dependencies = [
  "libdbus-sys",
  "ratatui",
  "serde",
+ "serde_json",
  "tokio",
  "toml",
  "tui-input",

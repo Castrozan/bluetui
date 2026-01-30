@@ -1,3 +1,7 @@
 /target
 .direnv/
+.devenv/
+.devenv.flake.nix
+devenv.lock
+devenv.yaml
 result

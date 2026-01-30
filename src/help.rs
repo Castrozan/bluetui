@@ -48,6 +48,9 @@ impl Help {
                         Span::from(config.paired_device.rename.to_string()).bold(),
                         Span::from(" Rename"),
                         Span::from(" | "),
+                        Span::from(config.paired_device.switch_profile.to_string()).bold(),
+                        Span::from(" Profile"),
+                        Span::from(" | "),
                         Span::from("⇄").bold(),
                         Span::from(" Nav"),
                     ])]
@@ -72,6 +75,9 @@ impl Help {
                             Span::from(" | "),
                             Span::from(config.paired_device.rename.to_string()).bold(),
                             Span::from(" Rename"),
+                            Span::from(" | "),
+                            Span::from(config.paired_device.switch_profile.to_string()).bold(),
+                            Span::from(" Profile"),
                             Span::from(" | "),
                             Span::from("k,").bold(),
                             Span::from("  Up"),
@@ -140,6 +146,18 @@ impl Help {
                         ]),
                     ]
                 }
+            }
+            FocusedBlock::ProfileSelector => {
+                vec![Line::from(vec![
+                    Span::from("j,k").bold(),
+                    Span::from("  Navigate"),
+                    Span::from(" | "),
+                    Span::from("↵ ").bold(),
+                    Span::from(" Switch"),
+                    Span::from(" | "),
+                    Span::from("Esc").bold(),
+                    Span::from(" Cancel"),
+                ])]
             }
             FocusedBlock::SetDeviceAliasBox => {
                 vec![Line::from(vec![

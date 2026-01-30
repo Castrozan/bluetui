@@ -8,19 +8,27 @@
     };
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-    rust-overlay,
-    ...
-  }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      rust-overlay,
+      ...
+    }:
     flake-utils.lib.eachDefaultSystem (
-      system: let
-        overlays = [(import rust-overlay)];
-        pkgs = import nixpkgs {inherit system overlays;};
-        bluetui = pkgs.callPackage ./package.nix {};
-      in {
+      system:
+      let
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs { inherit system overlays; };
+        rustToolchain = pkgs.rust-bin.stable.latest.default;
+        rustPlatform = pkgs.makeRustPlatform {
+          cargo = rustToolchain;
+          rustc = rustToolchain;
+        };
+        bluetui = pkgs.callPackage ./package.nix { inherit rustPlatform; };
+      in
+      {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             dbus
@@ -33,9 +41,11 @@
           default = bluetui;
           inherit bluetui;
         };
-        legacyPackages = pkgs.extend(final: prev: {
-          bluetui = final.callPackage ./package.nix {};
-        });
+        legacyPackages = pkgs.extend (
+          final: prev: {
+            bluetui = final.callPackage ./package.nix { };
+          }
+        );
       }
     );
 }

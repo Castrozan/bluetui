@@ -29,6 +29,7 @@ use crate::{
     config::{Config, Width},
     favorite::{read_favorite_devices_from_disk, save_favorite_devices_to_disk},
     notification::Notification,
+    profile::PipewireProfile,
     requests::Requests,
     spinner::Spinner,
 };
@@ -44,6 +45,7 @@ pub enum FocusedBlock {
     PairedDevices,
     NewDevices,
     SetDeviceAliasBox,
+    ProfileSelector,
     RequestConfirmation,
     EnterPinCode,
     EnterPasskey,
@@ -68,6 +70,10 @@ pub struct App {
     pub config: Arc<Config>,
     pub requests: Requests,
     pub auth_agent: AuthAgent,
+    pub available_profiles: Vec<PipewireProfile>,
+    pub profile_state: TableState,
+    pub pipewire_device_id: Option<u32>,
+    pub active_profile_index: Option<u32>,
 }
 
 impl App {
@@ -130,6 +136,10 @@ impl App {
             config,
             requests: Requests::default(),
             auth_agent,
+            available_profiles: Vec::new(),
+            profile_state: TableState::default(),
+            pipewire_device_id: None,
+            active_profile_index: None,
         })
     }
 
@@ -269,6 +279,74 @@ impl App {
                 frame.render_widget(alias, alias_block);
             }
         }
+    }
+
+    pub fn render_profile_selector(&mut self, frame: &mut Frame, area: Rect) {
+        let popup_height = (self.available_profiles.len() as u16 + 4).min(area.height - 2);
+
+        // " ● " marker = 3 chars, border + padding = 4, title = 18
+        let max_desc = self
+            .available_profiles
+            .iter()
+            .map(|p| p.description.len())
+            .max()
+            .unwrap_or(0);
+        let popup_width = ((max_desc + 6) as u16).max(20).min(area.width - 4);
+
+        let block = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(popup_height),
+                Constraint::Fill(1),
+            ])
+            .split(area);
+
+        let block = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Max(popup_width),
+                Constraint::Fill(1),
+            ])
+            .split(block[1])[1];
+
+        frame.render_widget(Clear, block);
+
+        let rows: Vec<Row> = self
+            .available_profiles
+            .iter()
+            .map(|p| {
+                let marker = if self.active_profile_index == Some(p.index) {
+                    " ●"
+                } else {
+                    ""
+                };
+                Row::new(vec![format!("{}{marker}", p.description)])
+            })
+            .collect();
+
+        let widths = [Constraint::Fill(1)];
+
+        let table = Table::new(rows, widths)
+            .header(
+                Row::new(vec![
+                    Cell::from("Profile").style(Style::default().fg(Color::Yellow)),
+                ])
+                .style(Style::new().bold())
+                .bottom_margin(1),
+            )
+            .block(
+                Block::default()
+                    .title(" Switch Profile ")
+                    .title_style(Style::default().bold())
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Thick)
+                    .border_style(Style::default().fg(Color::Green)),
+            )
+            .row_highlight_style(Style::default().bg(Color::DarkGray).fg(Color::White));
+
+        frame.render_stateful_widget(table, block, &mut self.profile_state.clone());
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
@@ -710,6 +788,11 @@ impl App {
             // Set alias popup
             if self.focused_block == FocusedBlock::SetDeviceAliasBox {
                 self.render_set_alias(frame, area);
+            }
+
+            // Profile selector popup
+            if self.focused_block == FocusedBlock::ProfileSelector {
+                self.render_profile_selector(frame, area);
             }
 
             // Request Confirmation
